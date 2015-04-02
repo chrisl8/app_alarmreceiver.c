@@ -407,7 +407,6 @@ static int receive_ademco_contact_id(struct ast_channel *chan, const void *data,
 	ast_verb(4, "AlarmReceiver: Waiting for first event from panel\n");
 
 	while (res >= 0) {
-		if (got_some_digits == 0) {
 			/* Send ACK tone sequence */
 			ast_verb(4, "AlarmReceiver: Sending 1400Hz 100ms burst (ACK)\n");
 			res = send_tone_burst(chan, "1400", 50, 0);
@@ -417,7 +416,6 @@ static int receive_ademco_contact_id(struct ast_channel *chan, const void *data,
 				ast_verb(4, "AlarmReceiver: Sending 2300Hz 100ms burst (ACK)\n");
 				res = send_tone_burst(chan, "2300", 50, 0);
 			}
-		}
 		if ( res >= 0)
 			res = receive_dtmf_digits(chan, event, sizeof(event) - 1, fdto, sdto);
 		if (res < 0) {
