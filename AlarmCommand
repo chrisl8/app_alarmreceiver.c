@@ -76,7 +76,7 @@ case ${FTYPE} in
     570) TYPE="Bypass" ;;
     602) TYPE="Periodic Test" ;;
     esac
-    echo "Zone: ${ZONE} Pin: ${PIN} Type: ${TYPE}"|mailx -s "Alarm System" ekpyroticfrood@gmail.com
+    echo "Zone: ${ZONE} Pin: ${PIN} Type: ${TYPE}"|mailx -s "Alarm System" emailaddress@gmail.com
 ;;
 esac
 #For Testing:
