@@ -565,10 +565,6 @@ static int alarmreceiver_exec(struct ast_channel *chan, const char *data)
 			return -1;
 	}
 
-	/* Wait for the connection to settle post-answer */
-	ast_verb(4, "AlarmReceiver: Waiting for connection to stabilize\n");
-	res = ast_safe_sleep(chan, 1250);
-
 	/* Attempt to receive the events */
 	if (!res) {
 		/* Determine the protocol to receive in advance */
