@@ -168,59 +168,22 @@ static void make_tone_burst(unsigned char *data, float freq, float loudness, int
 * Send a single tone burst for a specifed duration and frequency.
 * Returns 0 if successful
 */
-static int send_tone_burst(struct ast_channel *chan, float freq, int duration, int tldn)
+static int send_tone_burst(struct ast_channel *chan, const char *tone_freq, int tone_duration, int delay)
 {
-	int res = 0;
-	int i = 0;
-	int x = 0;
-	struct ast_frame *f, wf;
-	
-	struct {
-		unsigned char offset[AST_FRIENDLY_OFFSET];
-		unsigned char buf[640];
-	} tone_block;
+        if (delay && ast_safe_sleep(chan, delay)) {
+                return -1;
+        }
 
-	for (;;) {
+        if (ast_playtones_start(chan, toneloudness, tone_freq, 0)) {
+                return -1;
+        }
 
-		if (ast_waitfor(chan, -1) < 0) {
-			res = -1;
-			break;
-		}
+        if (ast_safe_sleep(chan, tone_duration)) {
+                return -1;
+        }
 
-		f = ast_read(chan);
-		if (!f) {
-			res = -1;
-			break;
-		}
-
-		if (f->frametype == AST_FRAME_VOICE) {
-			wf.frametype = AST_FRAME_VOICE;
-			wf.subclass.codec = AST_FORMAT_ULAW;
-			wf.offset = AST_FRIENDLY_OFFSET;
-			wf.mallocd = 0;
-			wf.data.ptr = tone_block.buf;
-			wf.datalen = f->datalen;
-			wf.samples = wf.datalen;
-			
-			make_tone_burst(tone_block.buf, freq, (float) tldn, wf.datalen, &x);
-
-			i += wf.datalen / 8;
-			if (i > duration) {
-				ast_frfree(f);
-				break;
-			}
-			if (ast_write(chan, &wf)) {
-				ast_verb(4, "AlarmReceiver: Failed to write frame on %s\n", chan->name);
-				ast_log(LOG_WARNING, "AlarmReceiver Failed to write frame on %s\n",chan->name);
-				res = -1;
-				ast_frfree(f);
-				break;
-			}
-		}
-
-		ast_frfree(f);
-	}
-	return res;
+        ast_playtones_stop(chan);
+        return 0;
 }
 
 /*
@@ -447,12 +410,12 @@ static int receive_ademco_contact_id(struct ast_channel *chan, const void *data,
 		if (got_some_digits == 0) {
 			/* Send ACK tone sequence */
 			ast_verb(4, "AlarmReceiver: Sending 1400Hz 100ms burst (ACK)\n");
-			res = send_tone_burst(chan, 1400.0, 100, tldn);
+			res = send_tone_burst(chan, "1400", 50, 0);
 			if (!res)
 				res = ast_safe_sleep(chan, 100);
 			if (!res) {
 				ast_verb(4, "AlarmReceiver: Sending 2300Hz 100ms burst (ACK)\n");
-				res = send_tone_burst(chan, 2300.0, 100, tldn);
+				res = send_tone_burst(chan, "2300", 50, 0);
 			}
 		}
 		if ( res >= 0)
@@ -562,7 +525,7 @@ static int receive_ademco_contact_id(struct ast_channel *chan, const void *data,
 
 		/* Send the kissoff tone */
 		if (res == 0)
-			res = send_tone_burst(chan, 1400.0, 900, tldn);
+			res = send_tone_burst(chan, "1400", 900, 200);
 	}
 
 	return res;
