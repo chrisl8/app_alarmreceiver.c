@@ -1,0 +1,111 @@
+# This is the heart of the system.
+# It interprets the incoming alarms and does work based on what they are.
+# You will have to make sure that the codes and zone names
+# match your system.
+for i in $(ls -tr /tmp/event-*)
+do
+for j in $(cat $i|grep ^[0-9])
+do
+PINumber=$(echo $j|cut -c7)
+# 1 is open, 3 is close
+case ${PINumber} in
+ 1) PIN="OPEN" ;;
+ 3) PIN="Closed" ;;
+ *) PIN=${PINumber} ;;
+esac
+ZONEnumber=$(echo $j|cut -c13-15)
+case ${ZONEnumber} in
+001) ZONE="A Door" ;;
+002) ZONE="Another Door" ;;
+003) ZONE="That Crazy Door" ;;
+004) ZONE="more doors" ;;
+005) ZONE="Hobbit Door" ;;
+006) ZONE="Keychain Remote 1"
+     case ${PIN} in
+      "OPEN") PIN="Disarmed" ;;
+      "Closed") PIN="ARMED!" ;;
+     esac
+     ;;
+007) ZONE="Keychain Remote 2"
+    case ${PIN} in
+      "OPEN") PIN="Disarmed" ;;
+      "Closed") PIN="ARMED!" ;;
+     esac
+     ;;
+008) ZONE="Garage Door" ;;
+009) ZONE="Garage Door 2" ;;
+010) ZONE="Window 1" ;;
+011) ZONE="Basement Door" ;;
+012) ZONE="Window 2" ;;
+013) ZONE="A Window" ;;
+014) ZONE="B Window" ;;
+015) ZONE="C Window" ;;
+016) ZONE="D Window" ;;
+017) ZONE="E Window" ;;
+018) ZONE="F Window" ;;
+019) ZONE="G Window" ;;
+*) ZONE=${ZONEnumber} ;;
+esac
+#Just grab first two of type to combine 131, 132 and 134
+FTYPE=$(echo $j|cut -c8-9) # Just using the first two digits of the type. 131, 132 and 134 are all alarms.
+case ${FTYPE} in
+13)
+    case ${PIN} in
+    "OPEN")
+    if [ -f /tmp/ARMED ] && [ ! ${ZONEnumber} -eq 011 ]
+        then
+            curl -s -F "token=<YOUR PUSHOVER TOKEN>" -F "title=${ZONE}" -F "message=${PIN}" -F "user=<YOUR PUSHOVER USER TOKEN>" -F "priority=2" -F "retry=30" -F "expire=3600"  https://api.pushover.net/1/messages.json
+        else
+            curl -s -F "token=<YOUR PUSHOVER TOKEN>" -F "title=${ZONE}" -F "message=${PIN}" -F "user=<YOUR PUSHOVER USER TOKEN>" -F "priority=-1" https://api.pushover.net/1/messages.json
+        fi
+    ;;
+    *)
+        curl -s -F "token=<YOUR OTHER PUSHOVER APP TOKEN>" -F "title=${ZONE}" -F "message=${PIN}" -F "user=<YOUR PUSHOVER USER TOKEN>" -F "priority=-1" https://api.pushover.net/1/messages.json
+    ;;
+    esac
+    #ssh root@192.168.1.4 "/bin/echo -e '\r${ZONE} ${PIN} at $(date)'>/dev/console"
+;;
+40)
+    curl -s -F "token=<ANOTHER PUSHOVER APP TOKEN>" -F "title=${ZONE}" -F "message=${PIN}" -F "user=<YOUR PUSHOVER USER TOKEN>" -F "priority=-1" https://api.pushover.net/1/messages.json
+    #ssh root@192.168.1.4 "/bin/echo -e '\r${ZONE} ${PIN} at $(date)'>/dev/console"
+;;
+*)
+    TYPE=$(echo $j|cut -c8-10)
+    case ${TYPE} in
+    381) TYPE="RF Supervision Trouble" ;;
+    570) TYPE="Bypass" ;;
+    602) TYPE="Periodic Test" ;;
+    esac
+    echo "Zone: ${ZONE} Pin: ${PIN} Type: ${TYPE}"|mailx -s "Alarm System" ekpyroticfrood@gmail.com
+;;
+esac
+#For Testing:
+#echo ${ZONE} ${PIN}
+#echo "Zone: ${ZONE} Pin:${PIN} Code:$j"|mailx -s "Alarm System Code" emailaddress@gmail.com
+#echo ${ZONE}, ${TYPEnumber}, ${PINumber}
+# Announce zone and state on speaker
+~asterisk/talkingAlarm/attText2Speech.sh "${ZONE} $PIN}" &
+# Warn ArloBot that basement door is open
+if [ ${ZONEnumber} -eq 011 ]
+then
+if [ ${PINumber} -eq 1 ]
+then
+~asterisk/updateArlobot.sh STOP &
+fi
+if [ ${PINumber} -eq 3 ]
+then
+~asterisk/updateArlobot.sh GO &
+fi
+fi
+# Send data to mySQL server
+TYPEnumber=$(echo $j|cut -c8-10)
+mysql -u <USER> -p -h mysql.example.com --password=<PASSWORD> -e "insert into alarm_db.status (zone, type, pin) values(${ZONEnumber}, ${TYPEnumber}, ${PINumber}) on duplicate key update pin=values(pin);" &
+done
+cp $i /eventArchive/
+rm $i
+done
+if [ -f /tmp/NoPreAlarm ]
+then
+rm /tmp/NoPreAlarm
+fi
+

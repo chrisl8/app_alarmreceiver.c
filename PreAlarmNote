@@ -1,0 +1,19 @@
+# This script will run as soon as your alarm system picks up the phone.
+# use it to send out a sort of "something is up" messages,
+# but be aware that at this point we have NO IDEA what is up,
+# so it could be like a low battery or something,
+# and you might not want to wake the neighbors just yet.
+if [ ! -f /tmp/LastPreAlarmNote ]
+then
+echo "0">/tmp/LastPreAlarmNote
+fi
+NOW=$(date +%s)
+DIFF=$(( $NOW - $(cat /tmp/LastPreAlarmNote) ))
+if [ $DIFF -gt 180 ]
+then
+# This would send a message via PushOver to your phone:
+curl -s -F "token=<YOUR PUSHOVER TOKEN>" -F "title=House" -F "message=Something is up . . ." -F "user=<YOUR PUSHOVER USER>" https://api.pushover.net/1/messages.json &
+# This will play a sound file:
+sudo aplay -q /etc/asterisk/sounds/door_open.wav &
+echo $(date +%s)>/tmp/LastPreAlarmNote
+fi
